@@ -1,0 +1,330 @@
+*****************************************************************************************************************
+***                                                                                                           ***
+*** Elements Version 9.20e (x64) - 11/13/2025 2:13 PM                                                         ***
+*** Platform: Windows 10                                                                                      ***
+*** Architecture: x64                                                                                         ***
+*** Serial Number:                                                                                            ***
+*** User:                                                                                                     ***
+***                                                                                                           ***
+*** TITLE:   * C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\Dual speed sensor test.wxsch***
+*** NETLIST: C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\design.net                     ***
+***                                                                                                           ***
+*****************************************************************************************************************
+
+********************************************************************************
+***                                                                          ***
+***                                Input Deck                                ***
+***                                                                          ***
+********************************************************************************
+
+.options bjtPSpiceSubNode=1
+.options allowdivzero=1
+.options initCondMode=2
+.options icres=0.002
+.options inhibitAttoISource=1
+#SIMETRIX
+V2 V2_P 0 8
+X$U1 V1_P U1_OMEGA 0 Motor_Model params: RM=1.78 k=0.328 J=0.0099 B=0.0065 Tint=0.066 pinnames: DCP OMEGA DCN
+.GRAPH U1_OMEGA curveLabel= U1-OMEGA nowarn=true ylog=auto xlog=auto analysis=tran|ac|dc GUID="0ad731ff-92bc-42ce-986a-00a4f236ff55" disabled=false PROBEREF=Probe3  
+V1 V1_P 0 7
+X$U3 V2_P U3_PWM U2_ENC U3_speed duall_speed_sensor params: RX=33k CX=10n R3=6.8k C3=1u pinnames: VCC PWM enc speed
+X$U2 V2_P U1_OMEGA U2_ENC Encoder params: ENC_RATIO=960 pinnames: VCC OMEGA ENC
+.GRAPH U3_speed curveLabel= U3-speed nowarn=true ylog=auto xlog=auto analysis=tran|ac|dc GUID="c82c1692-931f-4c81-b37c-0d42081a1673" disabled=false PROBEREF=Probe1  
+C2 V2_P 0 1n   
+C1 V1_P 0 1n   
+.tran 1
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\Motor Model.sxcmp
+.subckt Motor_Model DCP OMEGA DCN
+*#hierarchy
+B_TORQUE 0 B_TORQUE_N I=k*I(B_EMF)
+R1 EMF LM_N {RM}
+R_BFriction B_TORQUE_N 0 {1/B}
+R4 OMEGA B_TORQUE_N 1n
+B_EMF EMF DCN V=k*V(OMEGA)
+LM DCP LM_N 5m   
+B_int_torque_load B_TORQUE_N 0 I=IF((ABS(k*I(B_EMF)) > Tint)  || (ABS(V(OMEGA)) > 10u), Tint*SGN(V(OMEGA)),  k*I(B_EMF))
+C_JIntertia B_TORQUE_N 0 {J} IC=0  BRANCH={IF(ANALYSIS=2,1,0)} ICMODE=0
+.ends Motor_Model
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\Encoder.sxcmp
+.subckt Encoder VCC OMEGA ENC
+*#hierarchy
+X$I1 0 ENC SQU_SOURCE_I pinnames: P N params: _V1=-500f _V2=500f _FREQ=5k _DELAY=0 _DRATIOx100=50 _T_RISE=200n _T_FALL=200n _DAMP_COEF=0 _PWIDTH=99.8u _OFF_UNTIL_DELAY=0 _IDLE_IN_POP=0 _USEPHASE=0 _PHASE=0 _SHOWPARAMS=1
+R2 ENC B_ENC_P 50
+C1 ENC 0 10p   
+B_ENC B_ENC_P 0 V=SIN(SDT(ENC_RATIO*V(OMEGA))) > 0 ? V(VCC) : 0
+.ends Encoder
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\duall speed sensor.sxcmp
+.subckt duall_speed_sensor VCC PWM enc speed
+*#hierarchy
+X$U1 VCC PWM 0 U1__Q enc VCC C1_N C1_P 4538 pinnames: VCC Q TR _Q _TR _RST RC C
+R3 speed PWM {R3}
+R1 VCC C1_N {RX}
+C3 speed 0 {C3}   
+C1 C1_P C1_N {CX}   
+.ends duall_speed_sensor
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\4538.sxcmp
+.subckt 4538 VCC Q TR _Q _TR _RST RC C
+*#hierarchy
+V1 C 0 0
+X$U3 U3_SET B3_P U3_SET U3_RST U3_Q U3_QN HC74D pinnames: D CLK SET RST Q QN
+X$U2 VCC B3_P VCC U2_RST U3_SET U2_QN HC74D pinnames: D CLK SET RST Q QN
+A$U1 [B2_P U3_QN ] U3_RST U1$TP_GATE 
+.model U1$TP_GATE d_and rise_delay=1e-08 fall_delay=1e-08 
+X$S2 RC 0 U3_Q 0 gen_switch : RON=1m ROFF=1T VON=3 VOFF=2 pinnames: P N CP CN
+R1 Q ARB1_OUT 50
+R2 _Q ARB4_OUT 50
+B3 B3_P 0 V=( (V(TR) > 0.5) || (V(_TR) < 0.5)  )  ?  5 : 0 
+B2 B2_P 0 V=(TIME < 1p) ? 0 : 5 
+B1 U2_RST 0 V=( V(RC) < 0.632 * V(VCC) && ( V(_RST) > 0.5 ) ) ?  5 : 0 
+X$ARB4 VCC U2_QN ARB4_OUT $$arbsourceARB4 pinnames: vcc vin OUT 
+.subckt $$arbsourceARB4 vcc vin OUT 
+B$OUT OUT 0 V=V(VCC)*V(VIN)/5 
+.ends
+X$ARB1 VCC U3_SET ARB1_OUT $$arbsourceARB1 pinnames: vcc vin OUT 
+.subckt $$arbsourceARB1 vcc vin OUT 
+B$OUT OUT 0 V=V(VCC)*V(VIN)/5 
+.ends
+.OPTION DISCONTINUOUSIFSLEWRATE 1000000
+.ends 4538
+.subckt HC74D D CLOCK SET RESET QP QN
+Ahc74 [D CLOCK SET RESET] [QP QN] Ahc74
+.model Ahc74 d_logic_block
++ file = _74
++ out_delay = 4n
++ user = [5n, 5n, 6n, 7n, 8n] ; [ setup, rs delay, min clock, dtype delay ]
++ input_load = 4.5p
++ out_res = 40
++ family = "HC"
+** Copied from 74.ldf
+.file _74
+PORT D      in[0] ;
+PORT CK     in[1] ;
+PORT SR     in[2:3] ;  // r bit 3 s bit 2
+PORT out    out[0:1] ;
+EDGE (WIDTH=2, DELAY=USER[4], HOLD=USER[2], MINCLOCK=USER[3], CLOCK=in[1]) DTYPE=2;
+COMB (DELAY=USER[0], WIDTH=1) D_DEL ;
+COMB (DELAY=USER[1], WIDTH=2) SR_DEL ;
+SR_DEL  = SR ;
+D_DEL   = D ;
+DTYPE   := SR_DEL==1||SR_DEL==2 ?  (SR_DEL==2 ? 1 : 2) ;
+DTYPE   = D_DEL ? 1 : 2 ;
+out     = SR_DEL==0 ? 3 : DTYPE  ;
+.endf
+.ends
+**
+** This is implemented as an arbitrary logic block (ALB) as the built in
+** latch (original XSPICE device) does not model setup and hold time
+**
+** Specs:
+**                          
+** Setup time                       5ns
+** Hold time                        0ns
+** Minimum enable width             7nS
+** Prop delay Clock/RS to output    12n
+.subckt gen_switch 1 2 3 4
+S1 1 2 3 4 SW 
+.model SW VSWITCH RON={ron} ROFF={roff} VON={von} VOFF={voff} GIN=0
+.ends 
+********************************************************************************
+**
+** Timed switch - this is a comprehensive model with all features.
+** Uses new built-in timed switch model. Needs v8+. 
+**
+********************************************************************************
+.SUBCKT SQU_SOURCE_I 1 2 params: _V1=0 V2=1 _FREQ=100k _DELAY=0 _OFF_UNTIL_DELAY=0 _IDLE_IN_POP=0 _USEPHASE=0 _PHASE=0
+I1 1 2 PWLS PUL
++ V1={_V1} 
++ V2={_V2} 
++ FREQ={_FREQ} 
++ DELAY={IFF(_USEPHASE, _PHASE/360/_FREQ, _DELAY)} 
++ OFF_UNTIL_DELAY={_OFF_UNTIL_DELAY} 
++ END
+.ENDS
+A$BRIDGE_1 V2_P V2_P#_in HC_adc
+A$BRIDGE_2 U3.U1.B2_P U3.U1.B2_P#_in UNIV_adc
+A$BRIDGE_3 U3.U1.U3_SET#_out U3.U1.U3_SET HC_dac
+A$BRIDGE_4 U3.U1.U3_SET U3.U1.U3_SET#_in HC_adc
+A$BRIDGE_5 U3.U1.B3_P U3.U1.B3_P#_in HC_adc
+A$BRIDGE_6 U3.U1.U3_Q#_out U3.U1.U3_Q HC_dac
+A$BRIDGE_7 U3.U1.U2_RST U3.U1.U2_RST#_in HC_adc
+A$BRIDGE_8 U3.U1.U2_QN#_out U3.U1.U2_QN HC_dac
+
+.model HC_dac dac_bridge 
++ out_high=5        ; Logic high voltage
++ input_load=-31p   ; Compensates for added rise and fall time
++ t_rise=2n         ; Output rise time
++ t_fall=2n         ; Output fall time
++ g_pullup=0.024    ; 1/(logic high output resistance)
++ g_pulldown=0.034  ; 1/(logic low output resistance)
++ g_hiz=1e-9        ; 1/(high impedance output res)
++ knee_low = 2.0    ; voltage at resistive/constant current knee logic low
++ knee_high =2.75   ; voltage at resistive/constant current knee logic high
++ v_smooth = 0.5    ; Knee smoothing band
++ in_family="HC"
+** Analog-Digital
+.model UNIV_adc adc_bridge 
++ in_low=2.1 
++ in_high=2.2 
++ rise_delay=1e-12 
++ fall_delay=1e-12
++ out_family = "UNIV"
++ out_low = 0
++ out_high = 5
++ clamp_bias=0.5
++ clamp_res=10
+********************************************************
+**                                                     *
+**               4000 series CMOS 15Volt               *
+**                                                     *
+********************************************************
+.model HC_adc adc_bridge 
++ in_low=2.1 
++ in_high=2.2 
++ rise_delay=1e-12 
++ fall_delay=1e-12
++ out_family = "HC"
++ out_low = 0
++ out_high = 5
++ clamp_bias=0.5
++ clamp_res=10
+** Added 13.5.03 to make buffer devices accept analoginput connections
+
+********************************************************************************
+***                                                                          ***
+*** Starting Transient analysis at 2:13 PM                                   ***
+***                                                                          ***
+*** Analysis card: .tran 1                                                   ***
+***                                                                          ***
+********************************************************************************
+********************************************************************************
+***                                                                          ***
+***                            Simulation Options                            ***
+***                                                                          ***
+********************************************************************************
+RELTOL                    0.001
+ABSTOL                    1e-12
+VNTOL                     1e-06
+POINTTOL                  0.001
+TEMPERATURE               27C
+GMIN                      1e-12
+Matrix Solver             UF KLU Version 1.1
+
+
+
+********************************************************************************
+***                                                                          ***
+***                             Device parameters                            ***
+***                                                                          ***
+********************************************************************************
+Model parameters for devices of type d_logic_block
+==================================================
+Model:       U3.U1.U2.    U3.U1.U3.    
+             Ahc74        Ahc74        
+
+input_load   4.5p         4.5p         
+out_delay    4n           4n           
+out_res      40           40           
+
+
+Model parameters for devices of type dac_bridge
+===============================================
+Model:       HC_dac       
+
+g_hiz        1n           
+g_pulldown   34m          
+g_pullup     24m          
+input_load   -31p         
+knee_high    2.75         
+knee_low     2            
+out_high     5            
+t_fall       2n           
+t_rise       2n           
+v_smooth     500m         
+
+
+Model parameters for devices of type adc_bridge
+===============================================
+Model:       HC_adc       UNIV_adc     
+
+clamp_bias   500m         500m         
+clamp_res    10           10           
+fall_delay   1p           1p           
+in_high      2.2          2.2          
+in_low       2.1          2.1          
+out_high     5            5            
+out_low      0            0            
+rise_delay   1p           1p           
+
+
+Model parameters for devices of type d_and
+==========================================
+Model:       U3.U1.       
+             U1$TP_GATE   
+
+fall_delay   10n          
+rise_delay   10n          
+
+
+Model parameters for devices of type Switch
+===========================================
+Model:       U3.U1.S2.SW  
+
+gin          0            
+roff         1T           
+ron          1m           
+voff         2            
+von          3            
+
+
+Instance parameters for devices of type CAP3
+============================================
+Instance:    U1.          
+             C_JIntertia  
+Using model: $CAP3        
+
+branch       1            
+
+
+Analysis statistics
+===================
+
+Nominal temperature = 27
+Operating temperature = 27
+Total iterations = 1.49562e+06
+Transient iterations = 1.4956e+06
+Transient timepoints = 674115
+Accepted timepoints = 565385
+Total analysis time = 332.235
+Transient time = 0
+Matrix reordering time = 0
+L-U decomposition time = 0
+Matrix solve time = 0
+Load time = 0
+Transient L-U decomp time = 0
+Transient solve time = 0
+Circuit build time = 0.125
+Simulator initialise time = 0
+Data write time = 0
+Convergence test time = 0
+LTE time = 0
+JI2 Iterations = 24
+Diag. GMIN stepping iterations = 0
+Junc. GMIN stepping iterations = 0
+Source stepping iterations = 0
+PTA iterations = 0
+Number of matrix fill ins = -33
+Number of initial matrix elements = 82
+Circuit equations = 36
+State vector size = 154
+Number of write buffer faults = 0
+EVT outputs = 10
+EVT ports = 23
+EVT instances = 11
+EVT nodes = 10
+
+Run statistics
+==============
+
+Netlist read in time = 0.031
+Total run time = 332.829 seconds
+Analysis concluded 11/13/2025 2:19 PM

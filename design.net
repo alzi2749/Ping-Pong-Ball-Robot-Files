@@ -1,0 +1,78 @@
+* C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\Dual speed sensor test.wxsch
+*#SIMETRIX
+V2 V2_P 0 8
+X$U1 V1_P U1_OMEGA 0 Motor_Model params: RM=1.78 k=0.328 J=0.0099 B=0.0065 Tint=0.066 pinnames: DCP OMEGA DCN
+.GRAPH U1_OMEGA curveLabel= U1-OMEGA nowarn=true ylog=auto xlog=auto analysis=tran|ac|dc GUID="0ad731ff-92bc-42ce-986a-00a4f236ff55" disabled=false PROBEREF=Probe3  
+V1 V1_P 0 7
+X$U3 V2_P U3_PWM U2_ENC U3_speed duall_speed_sensor params: RX=33k CX=10n R3=6.8k C3=1u pinnames: VCC PWM enc speed
+X$U2 V2_P U1_OMEGA U2_ENC Encoder params: ENC_RATIO=960 pinnames: VCC OMEGA ENC
+.GRAPH U3_speed curveLabel= U3-speed nowarn=true ylog=auto xlog=auto analysis=tran|ac|dc GUID="c82c1692-931f-4c81-b37c-0d42081a1673" disabled=false PROBEREF=Probe1  
+C2 V2_P 0 1n   
+C1 V1_P 0 1n   
+.tran 1
+
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\Motor Model.sxcmp
+.subckt Motor_Model DCP OMEGA DCN
+*#hierarchy
+B_TORQUE 0 B_TORQUE_N I=k*I(B_EMF)
+R1 EMF LM_N {RM}
+R_BFriction B_TORQUE_N 0 {1/B}
+R4 OMEGA B_TORQUE_N 1n
+B_EMF EMF DCN V=k*V(OMEGA)
+LM DCP LM_N 5m   
+B_int_torque_load B_TORQUE_N 0 I=IF((ABS(k*I(B_EMF)) > Tint)  || (ABS(V(OMEGA)) > 10u), Tint*SGN(V(OMEGA)),  k*I(B_EMF))
+C_JIntertia B_TORQUE_N 0 {J} IC=0  BRANCH={IF(ANALYSIS=2,1,0)} ICMODE=0
+.op
+
+.ends Motor_Model
+
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\Encoder.sxcmp
+.subckt Encoder VCC OMEGA ENC
+*#hierarchy
+X$I1 0 ENC SQU_SOURCE_I pinnames: P N params: _V1=-500f _V2=500f _FREQ=5k _DELAY=0 _DRATIOx100=50 _T_RISE=200n _T_FALL=200n _DAMP_COEF=0 _PWIDTH=99.8u _OFF_UNTIL_DELAY=0 _IDLE_IN_POP=0 _USEPHASE=0 _PHASE=0 _SHOWPARAMS=1
+R2 ENC B_ENC_P 50
+C1 ENC 0 10p   
+B_ENC B_ENC_P 0 V=SIN(SDT(ENC_RATIO*V(OMEGA))) > 0 ? V(VCC) : 0
+.op
+
+.ends Encoder
+
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\duall speed sensor.sxcmp
+.subckt duall_speed_sensor VCC PWM enc speed
+*#hierarchy
+X$U1 VCC PWM 0 U1__Q enc VCC C1_N C1_P 4538 pinnames: VCC Q TR _Q _TR _RST RC C
+R3 speed PWM {R3}
+R1 VCC C1_N {RX}
+C3 speed 0 {C3}   
+C1 C1_P C1_N {CX}   
+.ends duall_speed_sensor
+
+** From C:\Users\azinc\OneDrive - UCB-O365\Junior Fall 25\ECEN 2270\Lab 4\4538.sxcmp
+.subckt 4538 VCC Q TR _Q _TR _RST RC C
+*#hierarchy
+V1 C 0 0
+X$U3 U3_SET B3_P U3_SET U3_RST U3_Q U3_QN HC74D pinnames: D CLK SET RST Q QN
+X$U2 VCC B3_P VCC U2_RST U3_SET U2_QN HC74D pinnames: D CLK SET RST Q QN
+A$U1 [B2_P U3_QN ] U3_RST U1$TP_GATE 
+.model U1$TP_GATE d_and rise_delay=1e-08 fall_delay=1e-08 
+
+X$S2 RC 0 U3_Q 0 gen_switch : RON=1m ROFF=1T VON=3 VOFF=2 pinnames: P N CP CN
+R1 Q ARB1_OUT 50
+R2 _Q ARB4_OUT 50
+B3 B3_P 0 V=( (V(TR) > 0.5) || (V(_TR) < 0.5)  )  ?  5 : 0 
+B2 B2_P 0 V=(TIME < 1p) ? 0 : 5 
+B1 U2_RST 0 V=( V(RC) < 0.632 * V(VCC) && ( V(_RST) > 0.5 ) ) ?  5 : 0 
+X$ARB4 VCC U2_QN ARB4_OUT $$arbsourceARB4 pinnames: vcc vin OUT 
+.subckt $$arbsourceARB4 vcc vin OUT 
+B$OUT OUT 0 V=V(VCC)*V(VIN)/5 
+.ends
+X$ARB1 VCC U3_SET ARB1_OUT $$arbsourceARB1 pinnames: vcc vin OUT 
+.subckt $$arbsourceARB1 vcc vin OUT 
+B$OUT OUT 0 V=V(VCC)*V(VIN)/5 
+.ends
+.tran 5m
+.OPTION DISCONTINUOUSIFSLEWRATE 1000000
+
+
+.ends 4538
+
